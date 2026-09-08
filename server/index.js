@@ -107,23 +107,23 @@ app.use('/api/{*splat}', (req, res) => {
 });
 
 // Serve frontend for all non-API routes (SPA fallback)
-if (existsSync(staticPath)) {
-  const indexPath = join(staticPath, 'index.html');
-  if (existsSync(indexPath)) {
-    app.use((req, res, next) => {
-      if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
-        res.sendFile(indexPath);
-      } else {
-        next();
-      }
-    });
+const indexPath = join(staticPath, 'index.html');
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
+    if (existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ message: 'Frontend not built. Run npm run build.' });
+    }
+  } else {
+    next();
   }
-}
+});
 
 // Global error handler (must be last)
 app.use(errorHandler);
 
-async function initAndListen() {
+async function start() {
   await connectDB();
   await verifyEmailConnection();
   app.listen(config.port, () => {
@@ -135,15 +135,4 @@ async function initAndListen() {
   });
 }
 
-const isDirectRun = process.argv[1] && (
-  process.argv[1].endsWith('server/index.js') ||
-  process.argv[1].endsWith('server\\index.js')
-);
-
-if (isDirectRun) {
-  initAndListen().catch(console.error);
-} else {
-  connectDB().catch(console.error);
-}
-
-export default app;
+start().catch(console.error);
