@@ -3,7 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 
 import config from './config.js';
 import { connectDB } from './db.js';
@@ -28,52 +28,16 @@ const __dirname = dirname(__filename);
 
 const app = express();
 
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
+app.use(cors({ origin: true, credentials: true }));
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res, next) => next());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-if (config.nodeEnv === 'development') {
-  app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      if (req.url.startsWith('/api')) {
-        console.log(`${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
-      }
-    });
-    next();
-  });
-}
-
 const uploadDir = join(__dirname, 'uploads');
 if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', cors(), express.static(uploadDir));
-
-const staticPath = join(__dirname, '..', '.output', 'public');
-
-if (existsSync(staticPath)) {
-  const indexPath = join(staticPath, 'index.html');
-  if (!existsSync(indexPath)) {
-    try {
-      const assets = readdirSync(join(staticPath, 'assets'));
-      const mainJs = assets.find(f => f.startsWith('index-') && f.endsWith('.js'));
-      const mainCss = assets.find(f => f.startsWith('styles-') && f.endsWith('.css'));
-      if (mainJs) {
-        writeFileSync(indexPath, `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>The Ali's Collegiate</title><meta name="description" content="A Complete Ecosystem for Students & Teachers"/><link rel="icon" type="image/svg+xml" href="/favicon.svg"/>${mainCss ? '<link rel="stylesheet" href="/assets/' + mainCss + '"/>' : ''}</head><body><div id="root"></div><script type="module" src="/assets/${mainJs}"></script></body></html>`);
-        console.log('Generated index.html');
-      }
-    } catch (e) {
-      console.error('Failed to generate index.html:', e.message);
-    }
-  }
-  app.use(express.static(staticPath));
-}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
@@ -96,23 +60,16 @@ app.use('/api/{*splat}', (req, res) => {
   res.status(404).json(successResponse(null, 'Endpoint not found', 404));
 });
 
-app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
-    const indexPath = join(staticPath, 'index.html');
-    if (existsSync(indexPath)) {
-      return res.sendFile(indexPath);
-    }
-  }
-  next();
-});
-
 app.use(errorHandler);
 
-async function start() {
-  await connectDB();
+connectDB().catch(console.error);
+
+const isNitro = !!process.env.NITRO;
+
+if (!isNitro) {
   app.listen(config.port, () => {
-    console.log(`The Ali's Collegiate running on port ${config.port}`);
+    console.log(`The Ali's Collegiate API running on port ${config.port}`);
   });
 }
 
-start().catch(console.error);
+export default app;
