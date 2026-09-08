@@ -5,7 +5,7 @@ import { PageHero } from "@/components/site/PageHero";
 import { pageHead } from "@/lib/seo";
 import { api } from "@/lib/api";
 import type { Resource } from "@/types";
-import { ResourceDetail } from "./resources.$slug.component";
+import { ResourceDetail } from "./resources.$slug.lazy";
 
 export const Route = createFileRoute("/resources/$slug")({
   head: ({ params }) =>
