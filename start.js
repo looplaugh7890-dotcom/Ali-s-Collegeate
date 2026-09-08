@@ -1,15 +1,15 @@
 import { execSync } from "child_process";
 import { existsSync } from "fs";
+import { join } from "path";
 
-console.log("Starting The Ali's Collegiate...");
+const root = import.meta.dirname;
 
-if (!existsSync(".output") && !existsSync("dist")) {
+if (!existsSync(join(root, ".output"))) {
   console.log("No build found. Building app...");
-  execSync("npm run build", { stdio: "inherit" });
+  execSync("npm run build", { stdio: "inherit", cwd: root });
 } else {
-  console.log("Build found. Skipping build step.");
+  console.log("Build found.");
 }
 
-console.log("Starting Express server...");
-process.chdir(import.meta.dirname);
-execSync("node server/index.js", { stdio: "inherit" });
+console.log("Starting server...");
+execSync("node .output/server/index.mjs", { stdio: "inherit", cwd: root });
