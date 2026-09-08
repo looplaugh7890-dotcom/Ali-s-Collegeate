@@ -109,9 +109,11 @@ app.use('/api/{*splat}', (req, res) => {
 // Serve frontend for all non-API routes (SPA fallback)
 if (existsSync(staticPath)) {
   const indexPath = join(staticPath, 'index.html');
-  app.get('*', (req, res) => {
-    if (!req.url.startsWith('/api')) {
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
       res.sendFile(indexPath);
+    } else {
+      next();
     }
   });
 }
