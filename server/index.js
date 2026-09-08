@@ -123,7 +123,7 @@ if (existsSync(staticPath)) {
 // Global error handler (must be last)
 app.use(errorHandler);
 
-async function start() {
+async function initAndListen() {
   await connectDB();
   await verifyEmailConnection();
   app.listen(config.port, () => {
@@ -135,4 +135,15 @@ async function start() {
   });
 }
 
-start().catch(console.error);
+const isDirectRun = process.argv[1] && (
+  process.argv[1].endsWith('server/index.js') ||
+  process.argv[1].endsWith('server\\index.js')
+);
+
+if (isDirectRun) {
+  initAndListen().catch(console.error);
+} else {
+  connectDB().catch(console.error);
+}
+
+export default app;

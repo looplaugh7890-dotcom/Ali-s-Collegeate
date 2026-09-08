@@ -1,13 +1,21 @@
-import { execSync } from "child_process";
-import { existsSync } from "fs";
-import { join } from "path";
+const { spawnSync, spawn } = require("child_process");
+const { existsSync } = require("fs");
+const { join } = require("path");
 
-const root = import.meta.dirname;
+const root = __dirname;
 
 if (!existsSync(join(root, ".output"))) {
   console.log("Building app...");
-  execSync("npm run build", { stdio: "inherit", cwd: root });
+  const build = spawnSync("npm", ["run", "build"], { stdio: "inherit", cwd: root, shell: true });
+  if (build.status !== 0) {
+    console.error("Build failed!");
+    process.exit(build.status);
+  }
 }
 
 console.log("Starting Nitro server...");
-execSync("node .output/server/index.mjs", { stdio: "inherit", cwd: root });
+const server = spawn("node", [".output/server/index.mjs"], { stdio: "inherit", cwd: root });
+server.on("exit", (code) => {
+  console.error("Server exited with code:", code);
+  process.exit(code || 1);
+});
