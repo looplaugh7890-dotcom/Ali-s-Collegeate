@@ -16,7 +16,7 @@ export async function connectDB() {
     console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
-    process.exit(1);
+    console.error('WARNING: Server starting without database. API routes will not work.');
   }
 }
 
