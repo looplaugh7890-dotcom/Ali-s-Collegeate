@@ -2,31 +2,15 @@ const { existsSync } = require("fs");
 const { join } = require("path");
 
 const root = __dirname;
-
-// Polyfill __exportAll used by Rolldown (Vite 8) in SSR bundles
-if (typeof globalThis.__exportAll === "undefined") {
-  globalThis.__exportAll = function (target, source) {
-    for (var key in source) {
-      if (key !== "default" && key !== "__esModule") {
-        Object.defineProperty(target, key, {
-          enumerable: true,
-          get: (function (k) {
-            return function () {
-              return source[k];
-            };
-          })(key),
-        });
-      }
-    }
-  };
-}
-
 const outputDir = join(root, ".output");
 
 if (!existsSync(outputDir)) {
   console.log("Building app...");
   const { execSync } = require("child_process");
   execSync("npm run build", { stdio: "inherit", cwd: root });
+} else {
+  console.log("Build found. Running SSR fix...");
+  try { require("./fix-ssr.cjs"); } catch(e) {}
 }
 
 process.env.NITRO = "1";
