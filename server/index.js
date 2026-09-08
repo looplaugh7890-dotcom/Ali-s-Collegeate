@@ -31,7 +31,14 @@ const app = express();
 
 // CORS — allow frontend origin + credentials
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: (origin, callback) => {
+    const allowed = [config.frontendUrl, process.env.FRONTEND_URL].filter(Boolean);
+    if (!origin || allowed.some(o => origin.startsWith(o))) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   credentials: true,
 }));
 
@@ -62,6 +69,15 @@ const uploadDir = join(__dirname, 'uploads');
 if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', cors(), express.static(uploadDir));
 
+// Serve built frontend (TanStack Start output)
+const frontendBuildPath = join(__dirname, '..', '.output', 'public');
+const distPath = join(__dirname, '..', 'dist');
+const staticPath = existsSync(frontendBuildPath) ? frontendBuildPath : distPath;
+
+if (existsSync(staticPath)) {
+  app.use(express.static(staticPath));
+}
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
@@ -89,6 +105,16 @@ app.get('/api/health', (req, res) => {
 app.use('/api/{*splat}', (req, res) => {
   res.status(404).json(successResponse(null, 'Endpoint not found', 404));
 });
+
+// Serve frontend for all non-API routes (SPA fallback)
+if (existsSync(staticPath)) {
+  const indexPath = join(staticPath, 'index.html');
+  app.get('*', (req, res) => {
+    if (!req.url.startsWith('/api')) {
+      res.sendFile(indexPath);
+    }
+  });
+}
 
 // Global error handler (must be last)
 app.use(errorHandler);
