@@ -7,7 +7,7 @@
     "dev": "concurrently \"vite dev\" \"node server/index.js\"",
     "dev:frontend": "vite dev",
     "dev:backend": "node server/index.js",
-    "build": "vite build && node generate-index.cjs",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "start": "node server/index.js",
     "preview": "vite preview",

@@ -3,13 +3,12 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 
 import config from './config.js';
 import { connectDB } from './db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { successResponse } from './utils/helpers.js';
-import { verifyEmailConnection } from './utils/email.js';
 
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
@@ -29,28 +28,16 @@ const __dirname = dirname(__filename);
 
 const app = express();
 
-// CORS — allow frontend origin + credentials
 app.use(cors({
-  origin: (origin, callback) => {
-    const allowed = [config.frontendUrl, process.env.FRONTEND_URL].filter(Boolean);
-    if (!origin || allowed.some(o => origin.startsWith(o))) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
+  origin: true,
   credentials: true,
 }));
 
-// Stripe webhook needs raw body (must be before json parser)
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }), (req, res, next) => next());
-
-// Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Request logging in development
 if (config.nodeEnv === 'development') {
   app.use((req, res, next) => {
     const start = Date.now();
@@ -64,21 +51,30 @@ if (config.nodeEnv === 'development') {
   });
 }
 
-// Static file uploads with CORS
 const uploadDir = join(__dirname, 'uploads');
 if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', cors(), express.static(uploadDir));
 
-// Serve built frontend (TanStack Start output)
-const frontendBuildPath = join(__dirname, '..', '.output', 'public');
-const distPath = join(__dirname, '..', 'dist');
-const staticPath = existsSync(frontendBuildPath) ? frontendBuildPath : distPath;
+const staticPath = join(__dirname, '..', '.output', 'public');
 
 if (existsSync(staticPath)) {
+  const indexPath = join(staticPath, 'index.html');
+  if (!existsSync(indexPath)) {
+    try {
+      const assets = readdirSync(join(staticPath, 'assets'));
+      const mainJs = assets.find(f => f.startsWith('index-') && f.endsWith('.js'));
+      const mainCss = assets.find(f => f.startsWith('styles-') && f.endsWith('.css'));
+      if (mainJs) {
+        writeFileSync(indexPath, `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>The Ali's Collegiate</title><meta name="description" content="A Complete Ecosystem for Students & Teachers"/><link rel="icon" type="image/svg+xml" href="/favicon.svg"/>${mainCss ? '<link rel="stylesheet" href="/assets/' + mainCss + '"/>' : ''}</head><body><div id="root"></div><script type="module" src="/assets/${mainJs}"></script></body></html>`);
+        console.log('Generated index.html');
+      }
+    } catch (e) {
+      console.error('Failed to generate index.html:', e.message);
+    }
+  }
   app.use(express.static(staticPath));
 }
 
-// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/resources', resourceRoutes);
@@ -92,46 +88,30 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/uploads', uploadRoutes);
 
-// Health check
 app.get('/api/health', (req, res) => {
-  res.json(successResponse({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  }));
+  res.json(successResponse({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() }));
 });
 
-// 404 for unknown API routes
 app.use('/api/{*splat}', (req, res) => {
   res.status(404).json(successResponse(null, 'Endpoint not found', 404));
 });
 
-// Serve frontend for all non-API routes (SPA fallback)
-const indexPath = join(staticPath, 'index.html');
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
+    const indexPath = join(staticPath, 'index.html');
     if (existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).json({ message: 'Frontend not built. Run npm run build.' });
+      return res.sendFile(indexPath);
     }
-  } else {
-    next();
   }
+  next();
 });
 
-// Global error handler (must be last)
 app.use(errorHandler);
 
 async function start() {
   await connectDB();
-  await verifyEmailConnection();
   app.listen(config.port, () => {
-    console.log(`\n  The Ali's Collegiate API`);
-    console.log(`  ────────────────────────`);
-    console.log(`  Server:  http://localhost:${config.port}`);
-    console.log(`  Health:  http://localhost:${config.port}/api/health`);
-    console.log(`  Env:     ${config.nodeEnv}\n`);
+    console.log(`The Ali's Collegiate running on port ${config.port}`);
   });
 }
 
