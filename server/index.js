@@ -35,10 +35,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Serve local uploads (Cloudinary is used for file uploads, this is a fallback)
 const uploadDir = join(__dirname, 'uploads');
 if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', cors(), express.static(uploadDir));
 
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/resources', resourceRoutes);
@@ -62,14 +64,25 @@ app.use('/api/{*splat}', (req, res) => {
 
 app.use(errorHandler);
 
-connectDB().catch(console.error);
-
-const isNitro = !!process.env.NITRO;
-
-if (!isNitro) {
-  app.listen(config.port, () => {
-    console.log(`The Ali's Collegiate API running on port ${config.port}`);
+// Serve built Vite SPA (dist/) for all non-API routes
+const distDir = join(__dirname, '..', 'dist');
+if (existsSync(distDir)) {
+  app.use(express.static(distDir));
+  // SPA fallback — send index.html for any unmatched route so the client router handles it
+  app.get('/{*splat}', (req, res) => {
+    res.sendFile(join(distDir, 'index.html'));
+  });
+} else {
+  app.get('/{*splat}', (req, res) => {
+    res.status(503).send('App is being built. Please wait a moment and refresh.');
   });
 }
+
+connectDB().catch(console.error);
+
+const port = config.port || 3001;
+app.listen(port, () => {
+  console.log(`The Ali's Collegiate server running on port ${port}`);
+});
 
 export default app;
